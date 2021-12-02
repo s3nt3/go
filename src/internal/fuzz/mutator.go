@@ -12,6 +12,31 @@ import (
 	"unsafe"
 )
 
+var (
+	customMutators map[string]reflect.Type
+)
+
+func init() {
+	customMutators = make(map[string]reflect.Type)
+}
+
+type CustomMutator interface {
+	Marshal() ([]byte, error)
+	Unmarshal([]byte) error
+	Mutate() error
+}
+
+func IsCustomMutator(t reflect.Type) bool {
+	customMutatorInterface := reflect.TypeOf((*CustomMutator)(nil)).Elem()
+	if t.Implements(customMutatorInterface) {
+		if _, ok := customMutators[t.Elem().Name()]; !ok {
+			customMutators[t.Elem().Name()] = t
+		}
+		return true
+	}
+	return false
+}
+
 type mutator struct {
 	r       mutatorRand
 	scratch []byte // scratch slice to avoid additional allocations
@@ -120,7 +145,13 @@ func (m *mutator) mutate(vals []any, maxBytes int) {
 		m.mutateBytes(&m.scratch)
 		vals[i] = m.scratch
 	default:
-		panic(fmt.Sprintf("type not supported for mutating: %T", vals[i]))
+		if !IsCustomMutator(reflect.TypeOf(vals[i])) {
+			panic(fmt.Sprintf("type not supported for mutating: %T", vals[i]))
+		}
+
+		if err := vals[i].(CustomMutator).Mutate(); err != nil {
+			panic(fmt.Sprintf("type not supported for mutating: %T, %s", vals[i], err.Error()))
+		}
 	}
 }
 

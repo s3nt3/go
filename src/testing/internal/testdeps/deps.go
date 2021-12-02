@@ -197,3 +197,7 @@ func (TestDeps) ResetCoverage() {
 func (TestDeps) SnapshotCoverage() {
 	fuzz.SnapshotCoverage()
 }
+
+func (TestDeps) IsCustomMutator(t reflect.Type) bool {
+	return fuzz.IsCustomMutator(t)
+}
