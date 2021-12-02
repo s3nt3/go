@@ -255,7 +255,9 @@ func (f *F) Add(args ...interface{}) {
 	var values []interface{}
 	for i := range args {
 		if t := reflect.TypeOf(args[i]); !supportedTypes[t] {
-			panic(fmt.Sprintf("testing: unsupported type to Add %v", t))
+			if !f.fuzzContext.deps.IsCustomMutator(t) {
+				panic(fmt.Sprintf("testing: unsupported type to Add %v", t))
+			}
 		}
 		values = append(values, args[i])
 	}
@@ -323,7 +325,9 @@ func (f *F) Fuzz(ff interface{}) {
 	for i := 1; i < fnType.NumIn(); i++ {
 		t := fnType.In(i)
 		if !supportedTypes[t] {
-			panic(fmt.Sprintf("testing: unsupported type for fuzzing %v", t))
+			if !f.fuzzContext.deps.IsCustomMutator(t) {
+				panic(fmt.Sprintf("testing: unsupported type for fuzzing %v", t))
+			}
 		}
 		types = append(types, t)
 	}

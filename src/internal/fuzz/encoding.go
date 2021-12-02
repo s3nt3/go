@@ -10,6 +10,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"reflect"
 	"strconv"
 )
 
@@ -38,9 +39,19 @@ func marshalCorpusFile(vals ...interface{}) []byte {
 		case []byte: // []uint8
 			fmt.Fprintf(b, "[]byte(%q)\n", t)
 		default:
-			panic(fmt.Sprintf("unsupported type: %T", t))
+			if !IsCustomMutator(reflect.TypeOf(val)) {
+				panic(fmt.Sprintf("unsupported type: %T", t))
+			}
+
+			buf, err := val.(CustomMutator).Marshal()
+			if err != nil {
+				panic(fmt.Sprintf("unsupported type: %T, %s", t, err.Error()))
+			}
+
+			fmt.Fprintf(b, "%s(%q)\n", reflect.TypeOf(val).Elem().Name(), buf)
 		}
 	}
+
 	return b.Bytes()
 }
 
@@ -192,6 +203,19 @@ func parseCorpusValue(line []byte) (interface{}, error) {
 		}
 		return strconv.ParseFloat(val, 64)
 	default:
+		if t, ok := customMutators[idType.Name]; ok {
+			if kind != token.STRING {
+				return nil, fmt.Errorf("string literal value required for type string")
+			}
+
+			if s, err := strconv.Unquote(val); err == nil {
+				m := reflect.New(t.Elem()).Interface()
+				return m, m.(CustomMutator).Unmarshal([]byte(s))
+			} else {
+				return nil, err
+			}
+		}
+
 		return nil, fmt.Errorf("expected []byte or primitive type")
 	}
 }
